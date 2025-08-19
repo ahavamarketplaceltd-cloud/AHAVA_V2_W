@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spin the Wheel — Button Upright + Smoother Spin (Try Again + Not Today + Golden Prize)</title>
+  <style>
+    :root {
+      --wheelSize: 550px;
+      --labelR: calc(var(--wheelSize) * 0.10);
+      --cardPad: 20px;
+      --card-bg: rgba(255,255,255,0.18);
+      --shadow: 0 12px 30px rgba(2,6,23,0.20);
+      --ease-out-strong: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: start center;
+      padding-top: 48px;
+      color: #0f172a;
+      background: linear-gradient(120deg, #4f46e5, #06b6d4, #10b981, #f59e0b);
+      background-size: 400% 400%;
+      animation: auroraShift 24s ease-in-out infinite;
+    }
+    @keyframes auroraShift {
+      0%   { background-position:   0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position:   0% 50%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body { animation: none; }
+    }
+
+    .wheel-card {
+      width: min(96vw, calc(var(--wheelSize) + var(--cardPad) * 2 + 20px));
+      margin: 0 auto;
+      padding: var(--cardPad) var(--cardPad) calc(var(--cardPad) + 4px);
+      border-radius: 20px;
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 2px solid #000;
+    }
+
+    .wheel-container {
+      position: relative;
+      width: var(--wheelSize);
+      height: var(--wheelSize);
+      margin: 0 auto;
+      isolation: isolate;
+      touch-action: none;
+    }
+
+    /* Result badge at the very top */
+    #result {
+      position: absolute;
+      top: -42px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.98);
+      padding: 8px 14px;
+      border-radius: 9999px;
+      box-shadow: var(--shadow);
+      font-size: 18px;
+      font-weight: 800;
+      min-height: 1.2em;
+      min-width: 250px;
+      z-index: 20;
+      color: #0f172a;
+    }
+
+    /* Try Again badge style tweak */
+    .wheel-container.try-again #result{
+      background: #fee2e2;
+      color: #7f1d1d;
+      animation: badgePop 800ms var(--ease-out-strong);
+    }
+    @keyframes badgePop {
+      0%   { transform: translateX(-50%) translateY(0) scale(1); }
+      35%  { transform: translateX(-50%) translateY(-6px) scale(1.06); }
+      100% { transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    /* BIG-WIN: make the badge pop larger & golden */
+    .wheel-container.big-win #result{
+      background: linear-gradient(135deg, #fff8dc, #ffe072);
+      color: #7a5300;
+      box-shadow: 0 8px 20px rgba(250,204,21,.45);
+      animation: badgeBigWin 1100ms var(--ease-out-strong);
+    }
+    @keyframes badgeBigWin {
+      0%   { transform: translateX(-50%) scale(0.9); opacity:.8; }
+      45%  { transform: translateX(-50%) scale(1.08); opacity:1; }
+      100% { transform: translateX(-50%) scale(1.0); }
+    }
+
+    /* Wrap we can jiggle without affecting the hub/button */
+    .spin-wrap{
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    .wheel-container.try-again .spin-wrap{
+      animation: jiggle 720ms ease-in-out;
+    }
+    @keyframes jiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-6deg); }
+      35%  { transform: rotate(4.5deg); }
+      55%  { transform: rotate(-3deg); }
+      75%  { transform: rotate(2deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .wheel {
+      width: 100%; height: 100%; border-radius: 50%;
+      background: conic-gradient(
+        #f59e0b 0deg 45deg,
+        /* Free Bottle! wedge as a gradient */
+        #ffec85 45deg,
+        #caa20a 55deg,
+        #f1f0e0 67.5deg,
+        #ffec85 90deg,
+
+        #22c55e 90deg 135deg,
+        #f59e0b 135deg 180deg,
+        #e11c25 180deg 225deg,
+        #8b5cf6 225deg 270deg,
+        #f59e0b 270deg 315deg,
+        #22c55e 315deg 360deg
+      );
+      will-change: transform;
+      position: relative;
+      box-shadow: inset 0 0 0 8px rgba(255,255,255,0.35),
+                  inset 0 0 30px rgba(0,0,0,0.12),
+                  0 8px 20px rgba(2,6,23,0.20);
+      z-index: 1;
+      user-select: none;
+      -webkit-user-drag: none;
+      -webkit-tap-highlight-color: transparent;
+      cursor: grab;
+      transform-origin: 50% 50%;
+      transition: none;
+    }
+    .wheel.dragging { cursor: grabbing; }
+
+    /* Labels */
+    .wheel span {
+      position: absolute; left: 50%; top: 50%;
+      transform-origin: center left;
+      font-size: 30px; color: #ffffff; font-weight: 800;
+      width: 220px; text-align: center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+      line-height: 1.12;
+      white-space: normal;
+      user-select: none;
+      pointer-events: none;
+    }
+    .wheel span:nth-child(1){ transform: rotate(22.5deg)  translateX(var(--labelR)); }
+    .wheel span:nth-child(2){ transform: rotate(67.5deg)  translateX(var(--labelR)); }
+    .wheel span:nth-child(3){ transform: rotate(112.5deg) translateX(var(--labelR)); width: 230px; font-size: 25px; }
+    .wheel span:nth-child(4){ transform: rotate(157.5deg) translateX(var(--labelR)); }
+    .wheel span:nth-child(5){ transform: rotate(202.5deg) translateX(var(--labelR)); width: 260px; font-size: px; }
+    .wheel span:nth-child(6){ transform: rotate(247.5deg) translateX(var(--labelR)); }
+    .wheel span:nth-child(7){ transform: rotate(292.5deg) translateX(var(--labelR)); }
+    .wheel span:nth-child(8){
+      transform: rotate(337.5deg) translateX(var(--labelR));
+      width: 260px;
+      font-size: 25px;
+      color:#000000; /* dark for contrast on gold */
+      text-shadow: 0 1px 2px rgba(255,255,255,.7), 0 0 12px rgba(255,210,63,.7);
+      font-weight: 900;
+    }
+
+    /* Pointer */
+    .arrow{
+      position: absolute;
+      top: 50%;
+      right: -20px;
+      transform: translateY(-50%) rotate(-90deg);
+      width: 0; height: 0;
+      border-left: 27px solid transparent;
+      border-right: 27px solid transparent;
+      border-bottom: 32px solid #fff;
+      z-index: 10;
+      filter: drop-shadow(0 2px 4px rgba(2,6,23,.45));
+      transition: border-bottom-color 180ms ease-in-out;
+    }
+    .arrow.tryagain { border-bottom-color: #ef4444; animation: arrowPulse 720ms ease-in-out; }
+    @keyframes arrowPulse {
+      0%   { filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0)); }
+      40%  { filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.9)); }
+      100% { filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0)); }
+    }
+    @keyframes subtleGlow {
+      0%   { filter: drop-shadow(0 0 0px rgba(255, 0, 255, 0.0)) drop-shadow(0 0 0px rgba(255, 0, 255, 0.0)); }
+      50%  { filter: drop-shadow(0 0 6px rgba(255, 0, 255, 0.85)) drop-shadow(0 0 14px rgba(255, 0, 255, 0.45)); }
+      100% { filter: drop-shadow(0 0 0px rgba(255, 0, 255, 0.0)) drop-shadow(0 0 0px rgba(255, 0, 255, 0.0)); }
+    }
+    .arrow.glow { animation: subtleGlow 1.2s ease-in-out infinite; }
+
+    /* Center hub (static upright) */
+    .hub{
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: calc(var(--wheelSize) * 0.22);
+      height: calc(var(--wheelSize) * 0.22);
+      border-radius: 50%;
+      background: #f0e0e0;
+      box-shadow: inset 0 8px 12px rgba(0,0,0,.15), 0 2px 8px rgba(0,0,0,.25);
+      z-index: 5;
+      display: grid; place-items: center;
+      pointer-events: none; /* let dragging pass through hub except button */
+    }
+    .wheel-container.try-again .hub{ animation: hubPulse 900ms var(--ease-out-strong); }
+    .wheel-container.big-win .hub{ animation: hubPulse 1100ms var(--ease-out-strong); }
+    @keyframes hubPulse {
+      0%   { transform: translate(-50%, -50%) scale(1); }
+      40%  { transform: translate(-50%, -50%) scale(0.96); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    /* Global emoji burst bits */
+    .burst-global {
+      position: fixed;
+      left: var(--x);
+      top: var(--y);
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      opacity: 0;
+      z-index: 9999;
+      pointer-events: none;
+      animation: burstGlobal var(--dur, 2000ms) ease-out forwards;
+    }
+    @keyframes burstGlobal {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+      10%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.25); }
+    }
+
+    /* --- Not Today :( visual state --- */
+    .wheel-container.not-today #result{
+      background: #e0f2fe; color: #0c4a6e;
+      animation: badgeSad 700ms cubic-bezier(0.22,1,0.36,1);
+    }
+    @keyframes badgeSad{
+      0%{ transform: translateX(-50%) scale(1) }
+      35%{ transform: translateX(-50%) scale(0.96) }
+      100%{ transform: translateX(-50%) scale(1) }
+    }
+    .arrow.nottoday{
+      border-bottom-color:#38bdf8;
+      animation: arrowPulseBlue 720ms ease-in-out;
+    }
+    @keyframes arrowPulseBlue{
+      0%{ filter: drop-shadow(0 0 0 rgba(56,189,248,0)) }
+      40%{ filter: drop-shadow(0 0 10px rgba(56,189,248,0.9)) }
+      100%{ filter: drop-shadow(0 0 0 rgba(56,189,248,0)) }
+    }
+
+    /* brief dim/vignette overlay for Not Today */
+    .dim-overlay{
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 50% 45%, rgba(15,23,42,0.0) 0%, rgba(15,23,42,0.35) 75%);
+      opacity: 0; z-index: 9998; pointer-events: none;
+      animation: dimFade var(--dur,1600ms) ease-out forwards;
+    }
+    @keyframes dimFade{
+      0%{ opacity: 0 }
+      20%{ opacity: 1 }
+      100%{ opacity: 0 }
+    }
+
+    /* falling “sad” emoji — scattered + staggered */
+    .sad-drop{
+      position: fixed; top: -40px; left: 0;
+      font-size: var(--size, 28px); opacity: 0; z-index: 9999;
+      pointer-events: none; will-change: top, left, transform, opacity;
+      animation:
+        fallY var(--dur, 9000ms) linear var(--delay, 0ms) forwards,
+        driftX var(--dur, 9000ms) ease-in-out var(--delay, 0ms) forwards,
+        spin var(--dur, 9000ms) linear var(--delay, 0ms) forwards;
+    }
+    @keyframes fallY{ 0%{opacity:0; top:-40px} 8%{opacity:1} 100%{opacity:0; top:var(--bottom,120vh)} }
+    @keyframes driftX{ 0%{ left: var(--x)} 50%{ left: calc(var(--x) + var(--dx)) } 100%{ left: calc(var(--x) + var(--dx2)) } }
+
+    /* === GOLD SLICE GLOW (always on) === */
+    :root{
+      --best-start: 45deg;            /* adjust if you move the Free Bottle wedge */
+      --best-size: calc(360deg / 8);  /* 8 slices */
+    }
+    .wheel::after{
+      content:"";
+      position:absolute; inset:-50px; border-radius:50%;
+      pointer-events:none; z-index:2;
+      background: radial-gradient(circle at 50% 50%, rgba(255,240,170,.95) 0%, rgba(255,210,63,.65) 38%, rgba(255,210,63,0) 68%);
+      mask: conic-gradient(from var(--best-start), #000 0 var(--best-size), transparent var(--best-size) 360deg);
+      -webkit-mask: conic-gradient(from var(--best-start), #000 0 var(--best-size), transparent var(--best-size) 360deg);
+      filter: blur(6px) saturate(1.2);
+      mix-blend-mode: screen;
+      opacity:.95;
+      animation: bestGlow 2.2s ease-in-out infinite;
+    }
+    .wheel::before{
+      content:"";
+      position:absolute; inset:-50px; border-radius:50%;
+      pointer-events:none; z-index:2;
+      background: conic-gradient(from var(--best-start), rgba(255,235,120,.9) 0 var(--best-size), transparent var(--best-size) 45deg);
+      mask: radial-gradient(circle, transparent 56%, #000 58%);
+      -webkit-mask: radial-gradient(circle, transparent 56%, #000 58%);
+      filter: blur(2px);
+      mix-blend-mode: screen;
+      animation: bestGlow 2.2s ease-in-out infinite reverse;
+    }
+    @keyframes bestGlow{
+      0%,100%{ transform: scale(1.00); opacity:.5; filter: blur(12px) saturate(1.1); }
+      50%    { transform: scale(1.02); opacity:1;   filter: blur(16px) saturate(1.3); }
+    }
+    .wheel span:nth-child(8){
+      text-shadow: 0 0 10px rgba(255,230,120,.9), 0 0 18px rgba(255,210,63,.8), 0 2px 6px rgba(0,0,0,.45);
+    }
+
+    /* Button inside the hub (stays upright) */
+    #spin-btn {
+      display: inline-block;
+      padding: 0;
+      width: 72%;
+      height: 72%;
+      border-radius: 9999px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, rgba(15,118,110,1), rgba(79,70,229,1));
+      box-shadow: 0 8px 16px rgba(2,6,23,0.25), inset 0 1px 0 rgba(255,255,255,0.22);
+      transition: transform 160ms var(--ease-out-strong), box-shadow 160ms var(--ease-out-strong), opacity 120ms ease-in-out;
+      pointer-events: auto;
+    }
+    #spin-btn:hover:enabled { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(2,6,23,0.30); }
+    #spin-btn:active:enabled { transform: translateY(0); }
+    #spin-btn:disabled { opacity: .85; cursor: not-allowed; }
+
+    /* Emoji burst bits (used by Try Again) */
+    .burst {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 22px;
+      opacity: 0;
+      z-index: 8;
+      pointer-events: none;
+      animation: burstFly 900ms ease-out forwards;
+    }
+    @keyframes burstFly {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+      10%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.2); }
+    }
+
+    /* ============ GOLDEN PRIZE OVERLAY ============ */
+    .win-overlay{
+      position: fixed; inset: 0;
+      z-index: 10000;
+      pointer-events: none;
+      display: grid; place-items: center;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255,244,194,.85) 0%, rgba(255,231,115,.65) 32%, rgba(255,224,114,.25) 54%, rgba(255,224,114,0) 70%),
+        radial-gradient(circle at 50% 120%, rgba(255,215,0,.25), transparent 60%);
+      animation: overlayPop 700ms var(--ease-out-strong);
+    }
+    @keyframes overlayPop {
+      0% { transform: scale(1.02); opacity: 0 }
+      100% { transform: scale(1.00); opacity: 1 }
+    }
+
+    .win-rays{
+      position: absolute; inset: -20%;
+      background:
+        repeating-conic-gradient(from 0deg,
+          rgba(255,215,0,0) 0 12deg,
+          rgba(255,215,0,.27) 12deg 24deg);
+      mix-blend-mode: screen;
+      filter: blur(2px) saturate(1.1);
+      opacity: .9;
+      animation: raysSpin 9s linear infinite, raysPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes raysSpin { to { transform: rotate(360deg) } }
+    @keyframes raysPulse { 0%,100%{ opacity:.85 } 50%{ opacity:1 } }
+
+    .win-medal{
+      position: relative;
+      width: min(70vw, 440px);
+      aspect-ratio: 1/1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 25%, #fff6cf 0 24%, transparent 25%),
+        conic-gradient(from 0deg, #ffe082, #f6c646, #ffd35a, #fff0b3, #f6c646, #ffe082);
+      box-shadow:
+        inset 0 8px 16px rgba(255,255,255,.6),
+        inset 0 -10px 18px rgba(165,115,0,.35),
+        0 20px 40px rgba(250,204,21,.45);
+      display: grid; place-items: center;
+      animation: medalPop 800ms var(--ease-out-strong);
+    }
+    @keyframes medalPop {
+      0% { transform: scale(.7) rotate(-6deg); opacity:.0 }
+      55%{ transform: scale(1.06) rotate(1deg); opacity:1 }
+      100%{ transform: scale(1.0) rotate(0deg) }
+    }
+    .win-medal .medal-text{
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 1000;
+      letter-spacing: .5px;
+      color: #6b4e00;
+      text-align: center;
+      text-shadow:
+        0 1px 0 #fff8e1,
+        0 0 20px rgba(255,215,0,.7);
+      padding: 0 26px;
+    }
+    .win-medal .shine{
+      position: absolute; inset: -2%;
+      border-radius: 50%;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,0) 22%),
+        radial-gradient(circle at 70% -10%, rgba(255,255,255,.7), transparent 36%);
+      mask: radial-gradient(circle, #000 56%, transparent 57%);
+      -webkit-mask: radial-gradient(circle, #000 56%, transparent 57%);
+      mix-blend-mode: screen;
+      animation: shineSweep 2200ms ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes shineSweep {
+      0%   { transform: rotate(-20deg) scale(1) }
+      50%  { transform: rotate(15deg)  scale(1.03) }
+      100% { transform: rotate(-20deg) scale(1) }
+    }
+
+    .ticker{
+      position: absolute; left: 0; right: 0;
+      font-weight: 1000;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a3500;
+      text-shadow: 0 1px 0 #fff6d1, 0 0 8px rgba(255,214,0,.6);
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: clamp(14px, 2.6vw, 22px);
+    }
+    .ticker.top{ top: 6%; }
+    .ticker.bottom{ bottom: 6%; }
+    .ticker span{
+      display: inline-block;
+      padding-left: 100%;
+      animation: tickerSlide 8s linear infinite;
+    }
+    @keyframes tickerSlide { to { transform: translateX(-100%) } }
+
+    .spark{
+      position: fixed;
+      left: var(--x); top: var(--y);
+      transform: translate(-50%,-50%) scale(.8);
+      font-size: var(--size, 14px);
+      opacity: 0;
+      z-index: 10001;
+      pointer-events: none;
+      animation: floatUp var(--dur, 2600ms) ease-out forwards;
+      filter: drop-shadow(0 0 6px rgba(255,215,0,.75));
+    }
+    @keyframes floatUp {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(.6) }
+      10%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--dy))) scale(1.2) }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wheel-card">
+  <div class="wheel-container" id="wheelContainer">
+    <div id="result" aria-live="polite"></div>
+    <div class="arrow" id="arrow"></div>
+
+    <!-- Rotating wheel wrapped so we can jiggle without touching the hub -->
+    <div class="spin-wrap">
+      <div id="wheel" class="wheel">
+        <span>10% off</span>
+        <span>5% off</span>
+        <span>Not Today :(</span>
+        <span>Try Again</span>
+        <span>5% off</span>
+        <span>10% off</span>
+        <span>5% off</span>
+        <span>Free Bottle!</span>
+      </div>
+    </div>
+
+    <!-- Static, upright hub with button -->
+    <div class="hub">
+      <button id="spin-btn" onclick="spinWheel()" onpointerdown="event.stopPropagation()">Spin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Segments + probabilities
+  const segments = ["10% off","5% off","Not Today :(","Try Again","5% off","10% off","5% off","Free Bottle!"];
+  const probabilities = [0.19, 0.12, 0.20, 0.10, 0.06, 0.19, 0.12, 0.02];
+  //const probabilities = [0, 0, 0, 0, 0, 0, 0, 1];
+  //const probabilities = [0, 0, 1, 0, 0, 0, 0, 0];
+
+  const segmentAngle = 360 / segments.length;
+
+  // Right-side pointer logic
+  const ARROW_ANGLE = 0; // points left into the wheel
+  const GRADIENT_TO_TRANSFORM_OFFSET = 0;
+
+  // Smoother & longer spin
+  const MIN_DUR_MS = 7000;
+  const MAX_DUR_MS = 9000;
+  const MIN_SPINS = 8;
+  const MAX_SPINS = 12;
+
+  let currentRotation = 0;
+  let isSpinning = false;
+
+  const wheelEl = document.getElementById("wheel");
+  const wheelContainer = document.getElementById("wheelContainer");
+  const btnEl = document.getElementById("spin-btn");
+  const arrowEl = document.getElementById("arrow");
+  const resultEl = document.getElementById("result");
+
+  // Drag-to-spin
+  let dragging = false;
+  let startRotationDrag = 0;
+  let angleSum = 0;
+  let lastAngle = 0;
+  let lastTime = 0;
+  let angularV = 0;
+  const FLICK_VELOCITY_THRESHOLD = 720; // deg/s (~2 spins/sec)
+
+  function getAngleFromCenter(clientX, clientY) {
+    const rect = wheelEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const x = clientX - cx;
+    const y = clientY - cy;
+    return Math.atan2(y, x) * 180 / Math.PI;
+  }
+  function shortestDelta(a, b) {
+    let d = b - a;
+    d = ((d + 540) % 360) - 180;
+    return d;
+  }
+  function mod(n, m) { return ((n % m) + m) % m; }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+
+  wheelEl.addEventListener("pointerdown", (e) => {
+    if (isSpinning) return;
+    wheelEl.setPointerCapture(e.pointerId);
+    dragging = true;
+    wheelEl.classList.add("dragging");
+    wheelEl.style.transition = "none";
+
+    startRotationDrag = currentRotation;
+    angleSum = 0;
+    lastAngle = getAngleFromCenter(e.clientX, e.clientY);
+    lastTime = performance.now();
+    angularV = 0;
+  });
+
+  wheelEl.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const a = getAngleFromCenter(e.clientX, e.clientY);
+    const now = performance.now();
+
+    const d = shortestDelta(lastAngle, a);
+    angleSum += d;
+
+    const newRotation = startRotationDrag + angleSum;
+    wheelEl.style.transform = `rotate(${newRotation}deg)`;
+
+    const dt = now - lastTime;
+    if (dt > 0) { angularV = (d / dt) * 1000; } // deg/s
+    lastAngle = a;
+    lastTime = now;
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    wheelEl.classList.remove("dragging");
+    currentRotation = startRotationDrag + angleSum;
+    try { wheelEl.releasePointerCapture(e.pointerId); } catch {}
+    if (Math.abs(angularV) >= FLICK_VELOCITY_THRESHOLD) { spinWheel(); }
+  }
+  wheelEl.addEventListener("pointerup", endDrag);
+  wheelEl.addEventListener("pointercancel", endDrag);
+
+  function normalizeProbs(probs) {
+    const cleaned = probs.map(p => Math.max(0, Number(p) || 0));
+    const sum = cleaned.reduce((a,b)=>a+b, 0);
+    if (sum <= 0) throw new Error("All probabilities are zero/invalid.");
+    return cleaned.map(p => p / sum);
+  }
+
+  function pickIndexWeighted(probs) {
+    const p = normalizeProbs(probs);
+    const r = Math.random();
+    let cum = 0;
+    for (let i = 0; i < p.length; i++) {
+      cum += p[i];
+      if (r < cum) return i;
+    }
+    return p.length - 1;
+  }
+
+  function spinWheel() {
+    if (isSpinning) return;
+
+    resultEl.textContent = "";
+    isSpinning = true;
+    btnEl.disabled = true;
+    btnEl.textContent = "Spinning";
+    arrowEl.classList.add("glow");
+
+    const index = pickIndexWeighted(probabilities);
+
+    // Compute where the middle of the selected slice should land under the pointer
+    const selectedAngleGradient = index * segmentAngle + segmentAngle / 2;
+    const selectedAngleTransform = selectedAngleGradient + GRADIENT_TO_TRANSFORM_OFFSET;
+
+    const base = mod(currentRotation, 360);
+    const delta = mod(ARROW_ANGLE - selectedAngleTransform - base, 360);
+
+    // Choose a smooth total rotation
+    const k = Math.floor(Math.random() * (MAX_SPINS - MIN_SPINS + 1)) + MIN_SPINS;
+    const totalDegrees = delta + 360 * k;
+    const duration = Math.floor(lerp(MIN_DUR_MS, MAX_DUR_MS, Math.random()));
+
+    // Single smooth transition
+    wheelEl.style.transition = "none";
+    wheelEl.offsetHeight; // reflow
+    const target = currentRotation + totalDegrees;
+    wheelEl.style.transition = `transform ${duration}ms var(--ease-out-strong)`;
+    wheelEl.style.transform = `rotate(${target}deg)`;
+
+    const onEnd = () => {
+      wheelEl.removeEventListener("transitionend", onEnd);
+      const normalized = mod(target, 360);
+      const pointerAngleGradient = mod(ARROW_ANGLE - GRADIENT_TO_TRANSFORM_OFFSET - normalized, 360);
+      const landedIndex = Math.floor(pointerAngleGradient / segmentAngle + 1e-9);
+      const resultText = segments[landedIndex];
+
+      resultEl.innerText = `You got: ${resultText}`;
+      arrowEl.classList.remove("glow");
+      currentRotation = target;
+
+      // Decide which effect to show
+      const normalizedText = resultText.trim().toLowerCase();
+      if (normalizedText === "try again") {
+        showTryAgainEffect();
+      } else if (normalizedText === "not today :(") {
+        showNotTodayEffect();
+      } else if (normalizedText === "free bottle!") {
+        showGoldenWinEffect();
+      } else {
+        launchConfetti();
+      }
+
+      isSpinning = false;
+      btnEl.disabled = false;
+      btnEl.textContent = "Spin";
+    };
+    wheelEl.addEventListener("transitionend", onEnd, { once: true });
+  }
+
+  // --- Try Again effect: jiggle + red pulse + emoji burst ---
+  function showTryAgainEffect() {
+    const emojis = ["🔁","↻","🔄"];
+    const container = document.getElementById("wheelContainer");
+
+    container.classList.add("try-again");
+    arrowEl.classList.add("tryagain");
+
+    globalEmojiBurst({ duration: 2200, count: 80, emojis });
+
+    setTimeout(() => {
+      container.classList.remove("try-again");
+      arrowEl.classList.remove("tryagain");
+    }, 950);
+  }
+
+  function globalEmojiBurst({ duration = 2000, count = 80, emojis = ["🔁","↻","🔄"] } = {}) {
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement("div");
+      el.className = "burst-global";
+      el.textContent = emojis[i % emojis.length];
+
+      const x = Math.random() * vw;
+      const y = Math.random() * vh;
+
+      const dx = (Math.random() - 0.5) * 200;
+      const dy = (Math.random() - 0.5) * 200 - 40;
+
+      el.style.setProperty("--x", x + "px");
+      el.style.setProperty("--y", y + "px");
+      el.style.setProperty("--dx", dx + "px");
+      el.style.setProperty("--dy", dy + "px");
+      el.style.setProperty("--dur", duration + "ms");
+
+      document.body.appendChild(el);
+      el.addEventListener("animationend", () => el.remove());
+    }
+  }
+
+  // --- Not Today :( effect: cyan pulse + brief dim + emoji rain ---
+function showNotTodayEffect(){
+  const emojis = ["💧"];
+  const container = document.getElementById("wheelContainer");
+
+  container.classList.add("not-today");
+  arrowEl.classList.add("nottoday");
+
+  dimOverlay(1600);
+  globalEmojiRain({ duration: 4000, count: 600, emojis });
+
+  setTimeout(()=>{
+    container.classList.remove("not-today");
+    arrowEl.classList.remove("nottoday");
+  }, 1000);
+}
+
+function dimOverlay(duration=1600){
+  const ov = document.createElement("div");
+  ov.className = "dim-overlay";
+  ov.style.setProperty("--dur", duration + "ms");
+  document.body.appendChild(ov);
+  ov.addEventListener("animationend", ()=> ov.remove());
+}
+
+function globalEmojiRain({ duration = 5000, count = 1000, emojis = ["💧"] } = {}){
+  const vw = Math.max(document.documentElement.clientWidth,  window.innerWidth  || 0);
+  const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+  const bottom = vh + 160; // fall off-screen
+
+  for (let i = 0; i < count; i++){
+    const el = document.createElement("div");
+    el.className = "sad-drop";
+    // pick a random emoji
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+
+    const x     = Math.random() * vw;                  // random start across viewport
+    const dx    = (Math.random() - 0.5) * vw * 0.18;   // mid drift (~18vw)
+    const dx2   = (Math.random() - 0.5) * vw * 0.28;   // end drift (~28vw)
+    const delay = Math.random() * 900;                 // staggered start up to 0.9s
+    const dur   = duration * (0.8 + Math.random() * 0.9); // 0.8×–1.7×
+    const size  = 22 + Math.random() * 16;             // 22–38px
+    //const spin  = (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 360);
+
+    el.style.setProperty("--x",      x + "px");
+    el.style.setProperty("--dx",     dx + "px");
+    el.style.setProperty("--dx2",    dx2 + "px");
+    el.style.setProperty("--bottom", bottom + "px");
+    el.style.setProperty("--delay",  delay + "ms");
+    el.style.setProperty("--dur",    Math.floor(dur) + "ms");
+    el.style.setProperty("--size",   size + "px");
+    //el.style.setProperty("--spin",   spin + "deg");
+
+    document.body.appendChild(el);
+    el.addEventListener("animationend", () => el.remove());
+  }
+}
+
+  /* ---------------- GOLDEN PRIZE SEQUENCE ---------------- */
+  function showGoldenWinEffect(){
+    // Pump the UI a bit
+    wheelContainer.classList.add("big-win");
+    setTimeout(()=> wheelContainer.classList.remove("big-win"), 1400);
+
+    // Overlay container
+    const overlay = document.createElement('div');
+    overlay.className = 'win-overlay';
+    document.body.appendChild(overlay);
+
+    // Spinning rays
+    const rays = document.createElement('div');
+    rays.className = 'win-rays';
+    overlay.appendChild(rays);
+
+    // Medal
+    const medal = document.createElement('div');
+    medal.className = 'win-medal';
+    medal.innerHTML = `
+      <div class="medal-text">🎉 FREE BOTTLE! 🎉</div>
+      <div class="shine"></div>
+    `;
+    overlay.appendChild(medal);
+
+    // Tickers
+    const topTicker = document.createElement('div');
+    topTicker.className = 'ticker top';
+    topTicker.innerHTML = `<span>★ GOLDEN PRIZE • FREE BOTTLE! • AHAVA ★ GOLDEN PRIZE • FREE BOTTLE! • AHAVA ★ </span>`;
+    overlay.appendChild(topTicker);
+
+    const bottomTicker = document.createElement('div');
+    bottomTicker.className = 'ticker bottom';
+    bottomTicker.innerHTML = `<span>★ GOLDEN PRIZE • FREE BOTTLE! • AHAVA ★ GOLDEN PRIZE • FREE BOTTLE! • AHAVA ★ </span>`;
+    overlay.appendChild(bottomTicker);
+
+    // Sparkles
+    spawnSparkles(140, 2600);
+
+    // Confetti: concentrated gold
+    goldenConfetti(5200);
+
+    // Auto-remove overlay
+    setTimeout(()=> overlay.remove(), 5200);
+  }
+
+  function spawnSparkles(count=120, duration=5000){
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    const shapes = ["✦","✸","✺","✶","✨","★","✳"];
+
+    for (let i=0;i<count;i++){
+      const el = document.createElement('div');
+      el.className = 'spark';
+      el.textContent = shapes[i % shapes.length];
+
+      const x = Math.random()*vw;
+      const y = Math.random()*vh;
+      const dx = (Math.random()-0.5)*160;
+      const dy = 80 + Math.random()*180;
+      const size = 12 + Math.random()*20;
+      const dur = duration*(0.7+Math.random()*1.2);
+
+      el.style.setProperty('--x', x+'px');
+      el.style.setProperty('--y', y+'px');
+      el.style.setProperty('--dx', dx+'px');
+      el.style.setProperty('--dy', dy+'px');
+      el.style.setProperty('--size', size+'px');
+      el.style.setProperty('--dur', Math.floor(dur)+'ms');
+
+      document.body.appendChild(el);
+      el.addEventListener('animationend', ()=> el.remove());
+    }
+  }
+</script>
+
+<!-- Confetti library -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script>
+  function launchConfetti() {
+    const duration = 10000;
+    const end = Date.now() + duration;
+
+    const defaults = { startVelocity: 30, spread: 10000, ticks: 1000, zIndex: 7000 };
+    const interval = setInterval(() => {
+      const timeLeft = end - Date.now();
+      if (timeLeft <= 0){ clearInterval(interval); return; }
+      confetti(Object.assign({}, defaults, {
+        particleCount: 50 * (timeLeft / duration),
+        origin: { x: Math.random(), y: Math.random() - 0.2 }
+      }));
+    }, 250);
+  }
+
+  // Gold-heavy barrage for BIG WIN
+  function goldenConfetti(totalMs=5200){
+    const colors = ['#FFD700','#FFF3B0','#FFE37E','#FFFFFF'];
+    const end = Date.now() + totalMs;
+    const CONFETTI_Z = 1000; // keep confetti behind all UI
+
+    (function frame(){
+      const timeLeft = end - Date.now();
+      if (timeLeft <= 0) return;
+
+      // Center blast
+      confetti({
+        particleCount: 80,
+        spread: 80,
+        startVelocity: 55,
+        gravity: 0.9,
+        scalar: 1.0,
+        ticks: 300,
+        zIndex: CONFETTI_Z,
+        colors
+      });
+
+      // Side streams
+      confetti({
+        particleCount: 40, angle: 60,  spread: 55,
+        origin: { x: 0,   y: 0.6 }, colors, zIndex: 10002
+      });
+      confetti({
+        particleCount: 40, angle: 120, spread: 55,
+        origin: { x: 1,   y: 0.6 }, colors, zIndex: 10002
+      });
+
+      requestAnimationFrame(frame);
+    })();
+  }
+</script>
+
+</body>
+</html>
